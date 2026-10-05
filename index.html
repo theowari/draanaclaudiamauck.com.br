@@ -25,7 +25,17 @@
   <!-- STAND-IN: favicon genérico nas cores da marca. Substituir pelo ícone oficial, se houver. -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234b1e35'/%3E%3Cpath d='M16 8.6c-1.8-1.3-3.9-1.7-5.6-1.1-2.6 1-3.4 3.6-3 6 .4 2 1.2 3.5 1.5 5.6.4 2.6.7 5.9 2.3 7 1.5 1 2.2-2 2.5-3.9.4-1.7.8-2.7 2.3-2.7s1.9 1 2.3 2.7c.3 1.9 1 4.9 2.5 3.9 1.6-1.1 1.9-4.4 2.3-7 .3-2.1 1.1-3.6 1.5-5.6.4-2.4-.4-5-3-6-1.7-.6-3.8-.2-5.6 1.1z' fill='%23f4b9cf'/%3E%3C/svg%3E">
 
-  <script>document.documentElement.classList.add('js');</script>
+  <!-- Tema definido antes da primeira pintura: escolha salva ou preferência do sistema -->
+  <script>
+    (() => {
+      const root = document.documentElement;
+      root.classList.add('js');
+      let theme = null;
+      try { theme = localStorage.getItem('theme'); } catch (e) {}
+      if (theme !== 'light' && theme !== 'dark') theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.dataset.theme = theme;
+    })();
+  </script>
 
   <!-- Fontes da marca: Plus Jakarta Sans (texto e títulos) + Instrument Serif (destaques pontuais). Em produção, auto-hospedar com font-display: swap. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,7 +55,7 @@
 
    COMO ADAPTAR À IDENTIDADE DE UMA CLÍNICA
    Todas as cores da página derivam dos tokens em :root (tema claro) e do
-   bloco prefers-color-scheme: dark logo abaixo. Para casar com a marca de
+   bloco :root[data-theme="dark"] logo abaixo. Para casar com a marca de
    um cliente, altere apenas esses valores e a fonte em --font (e o <link>
    do Google Fonts no index.html). Não há cores da marca fixas no restante
    do arquivo: transparências usam color-mix() sobre os próprios tokens.
@@ -98,25 +108,36 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --accent: #d9a9dc;
-    --accent-ink: #e6c3e7;
-    --bg: #150d12;
-    --surface: #1e141a;
-    --surface-2: #251920;
-    --tint: #2e1a25;
-    --tint-accent: #261d2e;
-    --ink: #f6eef2;
-    --muted: #bfaeb8;
-    --line: rgb(255 255 255 / 0.1);
-    --block: #3e1829;
-    --field-border: #7f6a77;
-    --error: #f97066;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 24px 60px -24px rgb(0 0 0 / 0.6);
-    color-scheme: dark;
-  }
+/* Tema escuro: data-theme vem da escolha salva ou de prefers-color-scheme (script no <head>) */
+:root[data-theme="dark"] {
+  --accent: #d9a9dc;
+  --accent-ink: #e6c3e7;
+  --bg: #150d12;
+  --surface: #1e141a;
+  --surface-2: #251920;
+  --tint: #2e1a25;
+  --tint-accent: #261d2e;
+  --ink: #f6eef2;
+  --muted: #bfaeb8;
+  --line: rgb(255 255 255 / 0.1);
+  --block: #3e1829;
+  --field-border: #7f6a77;
+  --error: #f97066;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 24px 60px -24px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
 }
+
+/* Troca de tema com View Transition API: um único cross-fade da página inteira.
+   Durante a troca, as transições CSS ficam desligadas para que nenhum componente
+   anime separado e o novo estado entre de uma vez. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1);
+}
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after { transition: none !important; }
 
 /* ---------- Base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
@@ -292,6 +313,29 @@ ul, ol { margin: 0; padding: 0; }
 .nav-toggle:active { transform: scale(0.94); }
 .nav-toggle[aria-expanded="true"] { border-color: color-mix(in srgb, var(--accent-soft) 60%, transparent); }
 
+/* Botão de tema: mesmo desenho do botão do menu; lua no claro, sol no escuro */
+.theme-toggle {
+  display: grid; place-items: center;
+  flex: none;
+  width: 44px; height: 44px;
+  margin-right: -16px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: var(--radius-pill);
+  background: transparent; color: var(--block-ink);
+  font-size: 1.2rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.16s var(--ease), border-color 0.2s ease;
+}
+.theme-toggle:active { transform: scale(0.94); }
+@media (hover: hover) {
+  .theme-toggle:hover { border-color: color-mix(in srgb, var(--accent-soft) 60%, transparent); }
+}
+.theme-toggle__sun { display: none; }
+:root[data-theme="dark"] .theme-toggle__sun { display: block; }
+:root[data-theme="dark"] .theme-toggle__moon { display: none; }
+html:not(.js) .theme-toggle { display: none; } /* sem JS não há como alternar */
+
 /* Hambúrguer: duas linhas que giram até formar um X (estado aberto/fechado) */
 .burger { position: relative; width: 18px; height: 12px; }
 .burger span {
@@ -373,6 +417,9 @@ html.menu-open .site-header { box-shadow: none; }
 @media (max-width: 1023px) {
   .nav-links, .nav-cta { display: none; }
   .nav-toggle { display: grid; }
+  .nav { gap: 12px; }
+  .theme-toggle { margin: 0 0 0 auto; }
+  .nav-toggle { margin-left: 0; } /* o botão de tema já empurra os dois para a direita */
 }
 @media (min-width: 1024px) { .mobile-menu { display: none !important; } }
 @media (min-width: 1024px) and (max-width: 1199px) {
@@ -621,7 +668,7 @@ html.menu-open .site-header { box-shadow: none; }
   letter-spacing: -0.03em;
 }
 .human__title em { font-style: normal; color: var(--primary); }
-@media (prefers-color-scheme: dark) { .human__title em { color: var(--accent-soft); } }
+:root[data-theme="dark"] .human__title em { color: var(--accent-soft); }
 .human__copy .lead { margin-top: 24px; }
 
 .human__band {
@@ -1006,14 +1053,15 @@ fieldset.field { border: 0; padding: 0; margin: 0; }
 .mail__aside li { display: flex; gap: 12px; font-size: 0.95rem; color: var(--block-muted); }
 .mail__aside li i { flex: none; font-size: 1.4rem; color: var(--accent-soft); }
 
-@media (prefers-color-scheme: dark) {
-  .link-btn, .mail__done a { color: var(--accent-soft); }
-  .done__icon { color: var(--accent-soft); }
-  .choice input:checked + span { color: var(--accent-soft); border-color: var(--accent-soft); }
-  .form input:focus-visible, .form select:focus-visible, .form textarea:focus-visible {
-    border-color: var(--accent-soft);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-soft) 20%, transparent);
-  }
+:root[data-theme="dark"] .link-btn,
+:root[data-theme="dark"] .mail__done a,
+:root[data-theme="dark"] .done__icon { color: var(--accent-soft); }
+:root[data-theme="dark"] .choice input:checked + span { color: var(--accent-soft); border-color: var(--accent-soft); }
+:root[data-theme="dark"] .form input:focus-visible,
+:root[data-theme="dark"] .form select:focus-visible,
+:root[data-theme="dark"] .form textarea:focus-visible {
+  border-color: var(--accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-soft) 20%, transparent);
 }
 
 @media (max-width: 1023px) {
@@ -1091,7 +1139,7 @@ fieldset.field { border: 0; padding: 0; margin: 0; }
   color: var(--primary);
   transition: transform 0.35s var(--ease), background-color 0.25s, color 0.25s;
 }
-@media (prefers-color-scheme: dark) { .faq__item button i { color: var(--accent-soft); } }
+:root[data-theme="dark"] .faq__item button i { color: var(--accent-soft); }
 .faq__item button[aria-expanded="true"] i { transform: rotate(45deg); background: var(--primary); color: #fff; border-color: var(--primary); }
 .faq__panel {
   display: grid;
@@ -1245,6 +1293,12 @@ fieldset.field { border: 0; padding: 0; margin: 0; }
         <a href="#agendar">Agendamento</a>
         <a href="#contato">Contato</a>
       </nav>
+
+      <button class="theme-toggle" type="button" aria-pressed="false" data-theme-toggle>
+        <span class="sr-only">Modo escuro</span>
+        <i class="ph ph-moon theme-toggle__moon" aria-hidden="true"></i>
+        <i class="ph ph-sun theme-toggle__sun" aria-hidden="true"></i>
+      </button>
 
       <a class="btn btn--light btn--sm nav-cta" href="https://wa.me/5519971508657" data-wa>
         <i class="ph ph-whatsapp-logo" aria-hidden="true"></i>
@@ -1909,6 +1963,50 @@ fieldset.field { border: 0; padding: 0; margin: 0; }
   window.matchMedia('(min-width: 1024px)').addEventListener('change', (e) => {
     if (e.matches) setMenu(false);
   });
+
+  // ---------- Tema claro / escuro (View Transition API) ----------
+  const root = document.documentElement;
+  const themeBtn = document.querySelector('[data-theme-toggle]');
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+  const savedTheme = () => { try { return localStorage.getItem('theme'); } catch { return null; } };
+
+  const syncThemeUI = () => {
+    const dark = root.dataset.theme === 'dark';
+    themeBtn?.setAttribute('aria-pressed', String(dark));
+    if (themeBtn) themeBtn.title = dark ? 'Ativar modo claro' : 'Ativar modo escuro';
+    // Barra do navegador no mobile acompanha a cor do header
+    if (themeMeta) themeMeta.content = getComputedStyle(root).getPropertyValue('--block').trim();
+  };
+
+  // Tema de destino: a atualização da View Transition é assíncrona, então cliques
+  // rápidos alternam a partir do alvo pendente, e não do tema ainda na tela
+  let targetTheme = root.dataset.theme;
+  let themeTransition = null;
+  const setTheme = (theme) => {
+    if (theme === targetTheme) return;
+    targetTheme = theme;
+    const apply = () => { root.dataset.theme = theme; syncThemeUI(); };
+    if (!document.startViewTransition || reduceMotion) { apply(); return; }
+    // O navegador fotografa a página antes e depois e faz um cross-fade único
+    root.classList.add('theme-switching');
+    const transition = document.startViewTransition(apply);
+    themeTransition = transition;
+    transition.finished.finally(() => {
+      if (themeTransition === transition) root.classList.remove('theme-switching');
+    });
+  };
+
+  themeBtn?.addEventListener('click', () => {
+    const next = targetTheme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('theme', next); } catch {}
+    setTheme(next);
+  });
+  // Sem escolha salva, segue o sistema quando ele muda
+  systemDark.addEventListener('change', (e) => {
+    if (!savedTheme()) setTheme(e.matches ? 'dark' : 'light');
+  });
+  syncThemeUI();
 
   // ---------- Reveal no scroll ----------
   const revealEls = document.querySelectorAll('[data-reveal]');
